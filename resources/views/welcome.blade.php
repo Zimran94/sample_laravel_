@@ -1,84 +1,166 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Users</title>
+<meta charset="UTF-8">
+<title>AJAX CRUD USERS</title>
+
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
+
 <body>
 
-    <h1>All Users</h1>
+<h1>User Management (AJAX)</h1>
 
-    <!-- ✅ Success Message -->
-    @if(session('success'))
-        <p style="color:green; font-weight:bold;">
-            {{ session('success') }}
-        </p>
-    @endif
+<p id="message" style="color:green;font-weight:bold;"></p>
 
-    <!-- ✅ Error Messages -->
-    @if ($errors->any())
-        <div style="color:red;">
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
+<!-- USERS TABLE -->
+<table border="1" cellpadding="10" id="userTable">
+    <tr>
+        <th>ID</th>
+        <th>Email</th>
+        <th>Name</th>
+        <th>Action</th>
+    </tr>
 
-    <!-- ✅ User Table -->
-    @if($users->count() > 0)
-        <table border="1" cellpadding="10">
-            <tr>
-                <th>ID</th>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Action</th>
-            </tr>
+    @foreach($users as $user)
+    <tr id="userRow{{ $user->id }}">
+        <td>{{ $user->id }}</td>
+        <td>{{ $user->email }}</td>
+        <td>{{ $user->name }}</td>
+        <td>
+            <button onclick="editUser({{ $user->id }}, '{{ $user->email }}', '{{ $user->name }}')" style="color:blue;">
+                Edit
+            </button>
 
-            @foreach($users as $user)
-            <tr>
-                <td>{{ $user->id }}</td>
-                <td>{{ $user->email }}</td>
-                <td>{{ $user->name }}</td>
-                <td>
-                    <!-- ✅ Delete Button -->
-                    <form action="/delete-user/{{ $user->id }}" method="POST"
-                          onsubmit="return confirm('Are you sure you want to delete this user?');">
-                        
-                        @csrf
-                        @method('DELETE')
+            <button onclick="deleteUser({{ $user->id }})" style="color:red;">
+                Delete
+            </button>
+        </td>
+    </tr>
+    @endforeach
+</table>
 
-                        <button type="submit" style="color:red;">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            @endforeach
-        </table>
-    @else
-        <p>No users found.</p>
-    @endif
+<hr>
 
-    <hr>
+<!-- FORM -->
+<h2 id="formTitle">Add User</h2>
 
-    <!-- ✅ Add User Form -->
-    <h2>Add User</h2>
+<form id="userForm">
+    @csrf
 
-    <form method="POST" action="/save-user">
-        @csrf
+    <input type="hidden" id="user_id">
 
-        <label>Email:</label><br>
-        <input type="email" name="email" required><br><br>
+    <label>Email:</label><br>
+    <input type="email" id="email" required><br><br>
 
-        <label>Name:</label><br>
-        <input type="text" name="name" required><br><br>
+    <label>Name:</label><br>
+    <input type="text" id="name" required><br><br>
 
-        <label>Password:</label><br>
-        <input type="password" name="password" required><br><br>
+    <label>Password (leave empty when updating):</label><br>
+    <input type="password" id="password"><br><br>
 
-        <button type="submit">Submit</button>
-    </form>
+    <button type="submit" id="submitBtn">Submit</button>
+</form>
+
+<script>
+$.ajaxSetup({
+    headers: {
+        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+    }
+});
+
+let editMode = false;
+
+/* ================= ADD / UPDATE ================= */
+$('#userForm').submit(function(e){
+    e.preventDefault();
+
+    let id = $('#user_id').val();
+    let url = editMode ? '/update-user/' + id : '/save-user';
+
+    $.ajax({
+        url: url,
+        type: 'POST',
+        data: {
+            email: $('#email').val(),
+            name: $('#name').val(),
+            password: $('#password').val()
+        },
+        success: function(res){
+
+            $('#message').text(res.message);
+
+            if(editMode){
+                // UPDATE ROW
+                $('#userRow' + id).html(`
+                    <td>${id}</td>
+                    <td>${res.user.email}</td>
+                    <td>${res.user.name}</td>
+                    <td>
+                        <button onclick="editUser(${id}, '${res.user.email}', '${res.user.name}')" style="color:blue;">Edit</button>
+                        <button onclick="deleteUser(${id})" style="color:red;">Delete</button>
+                    </td>
+                `);
+            } else {
+                // ADD ROW
+                $('#userTable').append(`
+                    <tr id="userRow${res.user.id}">
+                        <td>${res.user.id}</td>
+                        <td>${res.user.email}</td>
+                        <td>${res.user.name}</td>
+                        <td>
+                            <button onclick="editUser(${res.user.id}, '${res.user.email}', '${res.user.name}')" style="color:blue;">Edit</button>
+                            <button onclick="deleteUser(${res.user.id})" style="color:red;">Delete</button>
+                        </td>
+                    </tr>
+                `);
+            }
+
+            resetForm();
+        }
+    });
+});
+
+/* ================= EDIT ================= */
+function editUser(id, email, name){
+    editMode = true;
+
+    $('#formTitle').text('Update User');
+    $('#submitBtn').text('Update');
+
+    $('#user_id').val(id);
+    $('#email').val(email);
+    $('#name').val(name);
+    $('#password').val('');
+}
+
+/* ================= DELETE ================= */
+function deleteUser(id){
+    if(confirm("Delete this user?")){
+        $.ajax({
+            url: '/delete-user/' + id,
+            type: 'DELETE',
+            success: function(res){
+                $('#message').text(res.message);
+                $('#userRow' + id).remove();
+            }
+        });
+    }
+}
+
+/* ================= RESET FORM ================= */
+function resetForm(){
+    editMode = false;
+
+    $('#formTitle').text('Add User');
+    $('#submitBtn').text('Submit');
+
+    $('#userForm')[0].reset();
+    $('#user_id').val('');
+}
+</script>
 
 </body>
 </html>

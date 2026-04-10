@@ -8,14 +8,14 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    // Show all users
+    // SHOW USERS
     public function index()
     {
         $users = DB::table('users')->get();
-        return view('welcome', ['users' => $users]);
+        return view('welcome', compact('users'));
     }
 
-    // Store new user
+    // ADD USER (AJAX)
     public function store(Request $request)
     {
         $request->validate([
@@ -24,20 +24,62 @@ class UserController extends Controller
             'password' => 'required|min:6',
         ]);
 
-        DB::table('users')->insert([
+        $id = DB::table('users')->insertGetId([
             'email' => $request->email,
             'name' => $request->name,
             'password' => Hash::make($request->password),
         ]);
 
-        return redirect('/')->with('success', 'User added successfully!');
+        return response()->json([
+            'success' => true,
+            'message' => 'User added successfully!',
+            'user' => [
+                'id' => $id,
+                'email' => $request->email,
+                'name' => $request->name
+            ]
+        ]);
     }
 
-    // Delete user
+    // UPDATE USER (AJAX)
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'email' => 'required|email|unique:users,email,' . $id,
+            'name' => 'required',
+            'password' => 'nullable|min:6',
+        ]);
+
+        $data = [
+            'email' => $request->email,
+            'name' => $request->name,
+        ];
+
+        if ($request->password) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        DB::table('users')->where('id', $id)->update($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User updated successfully!',
+            'user' => [
+                'id' => $id,
+                'email' => $request->email,
+                'name' => $request->name
+            ]
+        ]);
+    }
+
+    // DELETE USER (AJAX)
     public function destroy($id)
     {
         DB::table('users')->where('id', $id)->delete();
 
-        return redirect('/')->with('success', 'User deleted successfully!');
+        return response()->json([
+            'success' => true,
+            'message' => 'User deleted successfully!'
+        ]);
     }
 }
