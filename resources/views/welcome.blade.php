@@ -21,6 +21,7 @@
         <th>ID</th>
         <th>Email</th>
         <th>Name</th>
+        <th>Profile</th>
         <th>Action</th>
     </tr>
 
@@ -29,6 +30,13 @@
         <td>{{ $user->id }}</td>
         <td>{{ $user->email }}</td>
         <td>{{ $user->name }}</td>
+        <td>
+            @if($user->profile)
+                <img src="{{ asset('storage/users/' . $user->profile) }}" width="50" height="50">
+            @else
+                N/A
+            @endif
+        </td>
         <td>
             <button onclick="editUser({{ $user->id }}, '{{ $user->email }}', '{{ $user->name }}')" style="color:blue;">
                 Edit
@@ -48,6 +56,8 @@
 <h2 id="formTitle">Add User</h2>
 
 <form id="userForm">
+
+<form id="userForm" enctype="multipart/form-data">
     @csrf
 
     <input type="hidden" id="user_id">
@@ -61,10 +71,18 @@
     <label>Password (leave empty when updating):</label><br>
     <input type="password" id="password"><br><br>
 
+    <label>Profile Image:</label><br>
+    <input type="file" id="profile_image" name="profile_image"><br><br>   
     <button type="submit" id="submitBtn">Submit</button>
 </form>
 
 <script>
+$.ajaxSetup({
+    headers: {
+        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+    }
+});
+
 $.ajaxSetup({
     headers: {
         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -80,14 +98,22 @@ $('#userForm').submit(function(e){
     let id = $('#user_id').val();
     let url = editMode ? '/update-user/' + id : '/save-user';
 
+    let formData = new FormData();
+    formData.append('email', $('#email').val());
+    formData.append('name', $('#name').val());
+    formData.append('password', $('#password').val());
+    let image = $('#profile_image')[0].files[0];
+
+    if(image){
+        formData.append('profile_image', image);
+    }
+
     $.ajax({
         url: url,
         type: 'POST',
-        data: {
-            email: $('#email').val(),
-            name: $('#name').val(),
-            password: $('#password').val()
-        },
+        data: formData,
+        processData: false,
+        contentType: false,
         success: function(res){
 
             $('#message').text(res.message);
@@ -98,6 +124,13 @@ $('#userForm').submit(function(e){
                     <td>${id}</td>
                     <td>${res.user.email}</td>
                     <td>${res.user.name}</td>
+                    <td>
+                        @if($user->profile)
+                            <img src="{{ asset('storage/profiles/' . $user->profile) }}" width="50" height="50">
+                        @else
+                            N/A
+                        @endif
+                    </td>
                     <td>
                         <button onclick="editUser(${id}, '${res.user.email}', '${res.user.name}')" style="color:blue;">Edit</button>
                         <button onclick="deleteUser(${id})" style="color:red;">Delete</button>

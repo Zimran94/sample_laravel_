@@ -24,10 +24,25 @@ class UserController extends Controller
             'password' => 'required|min:6',
         ]);
 
+        $imageName = null;
+
+        // IMAGE STORE
+        if($request->hasFile('profile_image'))
+        {
+            $image = $request->file('profile_image');
+
+            // CREATE UNIQUE NAME
+            $imageName = time().'.'.$image->getClientOriginalExtension();
+
+            // STORE IMAGE
+            $image->storeAs('users', $imageName, 'public');
+        }
+
         $id = DB::table('users')->insertGetId([
             'email' => $request->email,
             'name' => $request->name,
             'password' => Hash::make($request->password),
+            'profile' => $imageName,
         ]);
 
         return response()->json([
