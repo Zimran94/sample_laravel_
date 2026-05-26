@@ -4,78 +4,116 @@ namespace App\Http\Controllers;
 
 use App\Models\Post;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class PostController extends Controller
 {
-    // GET all posts
+    // GET ALL POSTS WITH CACHE
     public function index()
     {
-        return response()->json(Post::all());
+        $posts = Cache::remember('homepage_posts', 60, function () {
+            return Post::latest()->get();
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Posts fetched successfully',
+            'data' => $posts
+        ]);
     }
 
-    // POST create new post
+    // STORE NEW POST
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $request->validate([
             'title' => 'required',
             'content' => 'required'
         ]);
 
-        $post = Post::create($validated);
+        $post = Post::create([
+            'title' => $request->title,
+            'content' => $request->content
+        ]);
+
+        // CLEAR CACHE
+        Cache::forget('homepage_posts');
 
         return response()->json([
+            'status' => true,
             'message' => 'Post created successfully',
             'data' => $post
-        ], 201);
+        ]);
     }
 
-    // GET single post
-    public function show(string $id)
+    // SHOW SINGLE POST
+    public function show($id)
     {
         $post = Post::find($id);
 
         if (!$post) {
             return response()->json([
+                'status' => false,
                 'message' => 'Post not found'
             ], 404);
         }
-
-        return response()->json($post);
-    }
-
-    // PUT update post
-    public function update(Request $request, string $id)
-    {
-        $post = Post::find($id);
-
-        if (!$post) {
-            return response()->json([
-                'message' => 'Post not found'
-            ], 404);
-        }
-
-        $post->update($request->all());
 
         return response()->json([
+            'status' => true,
+            'data' => $post
+        ]);
+    }
+
+    // UPDATE POST
+    public function update(Request $request, $id)
+    {
+        $post = Post::find($id);
+
+        if (!$post) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Post not found'
+            ], 404);
+        }
+
+        $request->validate([
+            'title' => 'required',
+            'content' => 'required'
+        ]);
+
+        $post->update([
+            'title' => $request->title,
+            'content' => $request->content
+        ]);
+
+        // CLEAR CACHE
+        Cache::forget('homepage_posts');
+
+        return response()->json([
+            'status' => true,
             'message' => 'Post updated successfully',
             'data' => $post
         ]);
     }
 
-    // DELETE post
-    public function destroy(string $id)
+    // DELETE POST
+    public function destroy($id)
     {
         $post = Post::find($id);
 
         if (!$post) {
             return response()->json([
+                'status' => false,
                 'message' => 'Post not found'
             ], 404);
         }
 
         $post->delete();
 
+        // CLEAR CACHE
+        Cache::forget('homepage_posts');
+
         return response()->json([
+            'status' => true,
             'message' => 'Post deleted successfully'
         ]);
     }
